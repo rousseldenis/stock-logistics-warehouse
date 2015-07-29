@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openerp>
+    <data>
+        <record model="ir.ui.view" id="view_model_total_sale_sql_mat_view_search">
+            <field name="name">total.sale.materialized.view.search</field>
+            <field name="model">total.sale.mat.view</field>
+            <field name="arch" type="xml">
+               <search string="total.sale.mat.view">
+                    <field name="last_order_date"/>
+                    <field name='name'/>
+                    <filter name="without_sale_order_count" string="Without Order" domain="[('sale_order_count', '=', 0)]"/>
+                    <filter name="with_sale_order_count" string="With Order" domain="[('sale_order_count', '>', 0)]"/>
+                    <separator/>
+                    <filter string="Birthday in next 2 weeks"
+                                domain="[('birthday','&gt;=',(context_today()).strftime('%%Y-%%m-%%d')),
+                                         ('birthday','&lt;=',(context_today()+relativedelta(days=15)).strftime('%%Y-%%m-%%d'))]"/>
+                    <group expand="0" string="Group By...">
+                        <filter string="Customer" name="name"
+                            context="{'group_by': 'name'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+        <record id="view_model_total_sale_sql_mat_view_tree" model="ir.ui.view">
+            <field name="name">total.sale.materialized.view.tree</field>
+            <field name="model">total.sale.mat.view</field>
+            <field name="priority" eval="8"/>
+            <field name="arch" type="xml">
+                <tree string="day analysis" version="7.0">
+                    <field name='ref' />
+                    <field name='name' />
+                    <field name='lang' />
+                    <field name='title' />
+                    <field name='first_name' />
+                    <field name='last_name' />
+                    <field name='zip' />
+                    <field name='birthday' />
+                    <field name='email' />
+                    <field name='last_drive' />
+                    <field name='preferred_drive' />
+                    <field name='diff_drive' />
+                    <field name='sale_order_count' />
+                    <field name='promo_count' />
+                    <field name='average_basket' />
+                    <field name='company_id' />
+                    <field name='carrier_id'/>
+                    <field name='sale_order_count_drive' />
+                    <field name='promo_count_drive' />
+                    <field name='average_basket_drive' />
+                    <field name='total_product_diff' />
+                    <field name='total_qty_drive' />
+                    <field name='total_ttc_drive' />
+                    <field name='first_order_date' />
+                    <field name='last_order_date' />
+                </tree>
+            </field>
+        </record>
+        <record model="ir.actions.act_window" id="act_open_model_total_sale_sql_mat_view_view">
+            <field name="name">Total Sales</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">total.sale.mat.view</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">tree</field>
+            <field name="domain">[]</field>
+            <field name="context">{}</field>
+        </record>
+        <record model="ir.actions.act_window.view" id="act_open_model_total_sale_sql_mat_view_view_tree">
+            <field name="act_window_id" ref="act_open_model_total_sale_sql_mat_view_view"/>
+            <field name="sequence" eval="10"/>
+            <field name="view_mode">tree</field>
+            <field name="view_id" ref="view_model_total_sale_sql_mat_view_tree"/>
+        </record>
+
+
+        <menuitem id="menu_model_total_sale_sql_mat_view"
+                          action="act_open_model_total_sale_sql_mat_view_view"
+                          sequence="30"
+                          parent="sub_menu_2_materialized_report"
+                          name="Total Sales"/>
+
+    </data>
+</openerp>
