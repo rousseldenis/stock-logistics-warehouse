@@ -50,7 +50,7 @@ class TestProductPutaway(common.TransactionCase):
         self.assertEqual(
             putaway_per_product.putaway_apply(product_computer),
             False)
-        
+
     def test_05_putaway_apply_fixed(self):
         # Test super
         vals = {'name': 'TEST',
