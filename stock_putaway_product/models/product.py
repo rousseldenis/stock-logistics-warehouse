@@ -3,7 +3,7 @@
 # © 2016 Carlos Dauden - Tecnativa <carlos.dauden@tecnativa.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class ProductTemplate(models.Model):
@@ -13,6 +13,14 @@ class ProductTemplate(models.Model):
         comodel_name='stock.product.putaway.strategy',
         inverse_name='product_tmpl_id',
         string="Product stock locations")
+    is_product_variant = fields.Boolean(compute='_compute_is_variant_product')
+    
+    @api.one
+    def _compute_is_variant_product(self):
+        if self._inherits.get('product.template', False):
+            self.is_product_variant = True
+        else:
+            self.is_product_variant = False
 
 
 class ProductProduct(models.Model):
@@ -22,3 +30,11 @@ class ProductProduct(models.Model):
         comodel_name='stock.product.putaway.strategy',
         inverse_name='product_product_id',
         string="Product stock locations")
+    is_product_variant = fields.Boolean(compute='_compute_is_variant_product')
+    
+    @api.one
+    def _compute_is_variant_product(self):
+        if self._inherits.get('product.template', False):
+            self.is_product_variant = True
+        else:
+            self.is_product_variant = False
