@@ -14,7 +14,7 @@ class ProductTemplate(models.Model):
         inverse_name='product_tmpl_id',
         string="Product stock locations")
     is_product_variant = fields.Boolean(compute='_compute_is_variant_product')
-    
+
     @api.multi
     def _compute_is_variant_product(self):
         for product in self:
@@ -29,7 +29,7 @@ class ProductProduct(models.Model):
         inverse_name='product_product_id',
         string="Product stock locations")
     is_product_variant = fields.Boolean(compute='_compute_is_variant_product')
-    
+
     @api.multi
     def _compute_is_variant_product(self):
         for product in self:
