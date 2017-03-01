@@ -15,12 +15,10 @@ class ProductTemplate(models.Model):
         string="Product stock locations")
     is_product_variant = fields.Boolean(compute='_compute_is_variant_product')
     
-    @api.one
+    @api.multi
     def _compute_is_variant_product(self):
-        if self._inherits.get('product.template', False):
-            self.is_product_variant = True
-        else:
-            self.is_product_variant = False
+        for product in self:
+            product.is_product_variant = False
 
 
 class ProductProduct(models.Model):
@@ -32,9 +30,7 @@ class ProductProduct(models.Model):
         string="Product stock locations")
     is_product_variant = fields.Boolean(compute='_compute_is_variant_product')
     
-    @api.one
+    @api.multi
     def _compute_is_variant_product(self):
-        if self._inherits.get('product.template', False):
-            self.is_product_variant = True
-        else:
-            self.is_product_variant = False
+        for product in self:
+            product.is_product_variant = True
