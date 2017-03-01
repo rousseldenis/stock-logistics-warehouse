@@ -62,3 +62,15 @@ class TestProductPutaway(common.TransactionCase):
         self.assertEqual(
             putaway_fixed.putaway_apply(product_computer),
             self.env['stock.location'])
+
+    def test_06_putaway_check_variant(self):
+        t_product = self.browse_ref(
+            'product.product_product_4_product_template')
+        self.assertEqual(False,
+                         t_product.is_product_variant,
+                         'The product is not a template one')
+        p_product = self.browse_ref(
+            'product.product_product_5')
+        self.assertEqual(True,
+                         p_product.is_product_variant,
+                         'The product is not a variant one')
