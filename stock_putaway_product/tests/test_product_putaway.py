@@ -61,4 +61,4 @@ class TestProductPutaway(common.TransactionCase):
             'product.product_product_3')
         self.assertEqual(
             putaway_fixed.putaway_apply(product_computer),
-            False)
+            self.env['stock.location'])
