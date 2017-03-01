@@ -50,3 +50,15 @@ class TestProductPutaway(common.TransactionCase):
         self.assertEqual(
             putaway_per_product.putaway_apply(product_computer),
             False)
+        
+    def test_05_putaway_apply_fixed(self):
+        # Test super
+        vals = {'name': 'TEST',
+                'method': 'fixed'
+                }
+        putaway_fixed = self.env['product.putaway'].create(vals)
+        product_computer = self.browse_ref(
+            'product.product_product_3')
+        self.assertEqual(
+            putaway_fixed.putaway_apply(product_computer),
+            False)
