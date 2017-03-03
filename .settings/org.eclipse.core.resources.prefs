@@ -1,0 +1,8 @@
+eclipse.preferences.version=1
+encoding//stock_location_restrict_group/__manifest__.py=utf-8
+encoding//stock_location_restrict_group/models/stock_location.py=utf-8
+encoding//stock_location_restrict_group/models/stock_move.py=utf-8
+encoding//stock_location_restrict_group/models/stock_pack_operation.py=utf-8
+encoding//stock_location_restrict_group/models/stock_picking.py=utf-8
+encoding//stock_location_restrict_group/tests/test_stock_location_restrict_group.py=utf-8
+encoding//stock_quant_manual_assign/tests/test_stock_quant_manual_assign.py=utf-8
