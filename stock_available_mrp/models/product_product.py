@@ -28,26 +28,17 @@ class ProductProduct(models.Model):
     )
 
     @api.multi
-    @api.depends('potential_qty')
-    def _immediately_usable_qty(self):
-        """Add the potential quantity to the quantity available to promise.
-
-        This is the same implementation as for templates."""
-        super(ProductProduct, self)._immediately_usable_qty()
-        for product in self:
-            product.immediately_usable_qty += product.potential_qty
-
-    @api.multi
-    @api.depends('component_ids.potential_qty')
-    def _get_potential_qty(self):
-        """Compute the potential qty based on the available components."""
+    def _product_available(self, field_names=None, arg=False):
+        res = super(ProductProduct, self)._product_available(
+            field_names=field_names, arg=arg)
         bom_obj = self.env['mrp.bom']
         uom_obj = self.env['product.uom']
 
-        for product in self:
+        for prod_id in res:
+            product = self.browse(prod_id)
             bom_id = bom_obj._bom_find(product_id=product.id)
             if not bom_id:
-                product.potential_qty = 0.0
+                res[prod_id]['potential_qty'] = 0.0
                 continue
 
             bom = bom_obj.browse(bom_id)
@@ -57,7 +48,7 @@ class ProductProduct(models.Model):
 
             if not component_needs:
                 # The BoM has no line we can use
-                product.potential_qty = 0.0
+                potential_qty = 0.0
 
             else:
                 # Find the lowest quantity we can make with the stock at hand
@@ -72,7 +63,29 @@ class ProductProduct(models.Model):
                     bom.product_qty,
                     bom.product_tmpl_id.uom_id
                 )
-                product.potential_qty = bom_qty * components_potential_qty
+                potential_qty = bom_qty * components_potential_qty
+            res[prod_id]['potential_qty'] = potential_qty
+            res[prod_id]['immediately_usable_qty'] += potential_qty
+        return res
+
+    @api.multi
+    @api.depends('potential_qty', 'component_ids.immediately_usable_qty')
+    def _immediately_usable_qty(self):
+        """Add the potential quantity to the quantity available to promise.
+
+        This is the same implementation as for templates."""
+        res = self._product_available()
+        for prod in self:
+            prod.immediately_usable_qty = res[prod.id][
+                'immediately_usable_qty']
+
+    @api.multi
+    @api.depends('component_ids.potential_qty')
+    def _get_potential_qty(self):
+        """Compute the potential qty based on the available components."""
+        res = self._product_available()
+        for product in self:
+            product.potential_qty = res[product.id]['potential_qty']
 
     def _get_component_qty(self, component):
         """ Return the component qty to use based en company settings.
