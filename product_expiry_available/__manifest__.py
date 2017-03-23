@@ -14,8 +14,8 @@
     'depends': ['stock',
                 'product_expiry'
                 ],
-    'data': [
-    ],
+    'data': ['views/res_config.xml',
+             ],
     'demo': [
     ],
     'installable': True,

@@ -10,8 +10,13 @@ class TestProductExpiryAvailable(common.TransactionCase):
 
     def setUp(self):
         super(TestProductExpiryAvailable, self).setUp()
+        param_obj = self.env['ir.config_parameter']
+        param_obj.set_param('stock_qty_available_lot_expired', True)
 
-        self.product_1 = self.env.ref('stock.product_icecream')
+        vals = {'name': 'Product with lot',
+                'type': 'product'
+                }
+        self.product_1 = self.env['product.product'].create(vals)
         self.product_1.tracking = 'lot'
         self.warehouse_1 = self.env.ref('stock.warehouse0')
 
@@ -112,3 +117,21 @@ class TestProductExpiryAvailable(common.TransactionCase):
         self.assertEqual(
             self.product_1.with_context(pivot_date=pivot_date).qty_available,
             10)
+
+    def test_03_configuration(self):
+        wizard = self.env['stock.config.settings'].create({})
+
+        self.assertEquals(
+            wizard.stock_qty_available_lot_expired,
+            True,
+            'The default stock_qty_available_lot_expired should be True')
+
+        wizard.stock_qty_available_lot_expired = False
+        wizard.execute()
+
+        param_obj = self.env['ir.config_parameter']
+        value = param_obj.get_param('stock_qty_available_lot_expired')
+        self.assertEquals(
+            value,
+            False,
+            'The set value of stock_qty_available_lot_expired should be False')

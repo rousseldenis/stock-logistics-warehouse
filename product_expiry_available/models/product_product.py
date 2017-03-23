@@ -10,6 +10,12 @@ class ProductProduct(models.Model):
     _inherit = 'product.product'
 
     def _get_domain_locations(self):
+        param_obj = self.env['ir.config_parameter']
+        expired_lots = param_obj.get_param(
+            'stock_qty_available_lot_expired',
+            False)
+        if not expired_lots:
+            return super(ProductProduct, self)._get_domain_locations()
 
         quant_domain, move_in_domain, move_out_domain = super(
             ProductProduct, self)._get_domain_locations()
