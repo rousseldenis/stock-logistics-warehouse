@@ -20,14 +20,40 @@ class ProductTemplate(models.Model):
              "quantity that can be made for a any single variant.")
 
     @api.multi
+    def _product_available(self, name=None, arg=False):
+        res = super(ProductTemplate, self)._product_available(name, arg)
+
+        variants = self.env['product.product']
+        for tmpl in self:
+            variants += tmpl.product_variant_ids
+        variant_available = variants._product_available()
+
+        for tmpl in self:
+            if isinstance(tmpl.id, models.NewId):
+                # useless computation when product only exists in cache
+                continue
+            potential_qty = 0.0
+            if tmpl.bom_ids:
+                for p in tmpl.product_variant_ids:
+                    if potential_qty <\
+                            variant_available[p.id]["potential_qty"]:
+                        potential_qty = variant_available[p.id][
+                            "potential_qty"]
+                res[tmpl.id]['immediately_usable_qty'] = potential_qty
+            res[tmpl.id].update({"potential_qty": potential_qty})
+        return res
+
+    @api.multi
     @api.depends('potential_qty')
     def _immediately_usable_qty(self):
         """Add the potential quantity to the quantity available to promise.
 
         This is the same implementation as for variants."""
-        super(ProductTemplate, self)._immediately_usable_qty()
-        for tmpl in self:
-            tmpl.immediately_usable_qty += tmpl.potential_qty
+        res = self._product_available()
+        for tmpl in self.filtered(lambda x: not isinstance(
+                x.id, models.NewId)):
+            tmpl.immediately_usable_qty = res[tmpl.id][
+                'immediately_usable_qty']
 
     @api.multi
     @api.depends('product_variant_ids.potential_qty')
@@ -39,8 +65,7 @@ class ProductTemplate(models.Model):
         So we set the arbitrary rule that we can promise up to the biggest
         variant's potential.
         """
-        for tmpl in self:
-            if not tmpl.product_variant_ids:
-                continue
-            tmpl.potential_qty = max(
-                [v.potential_qty for v in tmpl.product_variant_ids])
+        res = self._product_available()
+        for tmpl in self.filtered(lambda x: not isinstance(
+                x.id, models.NewId)):
+            tmpl.potential_qty = res[tmpl.id]['potential_qty']
