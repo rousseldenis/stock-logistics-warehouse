@@ -25,8 +25,9 @@ class ProductProduct(models.Model):
             pivot_date = fields.Datetime.now()
 
         quant_domain += [
-            '|', '&',
+            '|',
             ('lot_id', '=', False),
+            '&',
             '&',
             ('lot_id', '!=', False),
             ('lot_id.removal_date', '!=', False),
