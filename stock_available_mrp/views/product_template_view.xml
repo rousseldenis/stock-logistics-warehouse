@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<openerp>
+<odoo>
     <data>
         <!-- Add the quantity available to promise in the product form -->
         <record id="view_product_form_potential_qty" model="ir.ui.view">
@@ -24,4 +24,4 @@
             </field>
         </record>
     </data>
-</openerp>
+</odoo>

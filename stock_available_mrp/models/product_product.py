@@ -4,10 +4,10 @@
 
 from collections import Counter
 
-from openerp import models, fields, api
-from openerp.addons import decimal_precision as dp
+from odoo import models, fields, api
+from odoo.addons import decimal_precision as dp
 
-from openerp.exceptions import AccessError
+from odoo.exceptions import AccessError
 
 
 class ProductProduct(models.Model):
@@ -16,7 +16,7 @@ class ProductProduct(models.Model):
     potential_qty = fields.Float(
         compute='_get_potential_qty',
         type='float',
-        digits_compute=dp.get_precision('Product Unit of Measure'),
+        digits=dp.get_precision('Product Unit of Measure'),
         string='Potential',
         help="Quantity of this Product that could be produced using "
              "the materials already at hand.")
@@ -30,29 +30,17 @@ class ProductProduct(models.Model):
     )
 
     @api.multi
-    @api.depends('potential_qty')
-    def _immediately_usable_qty(self):
-        """Add the potential quantity to the quantity available to promise.
-
-        This is the same implementation as for templates."""
-        super(ProductProduct, self)._immediately_usable_qty()
-        for product in self:
-            product.immediately_usable_qty += product.potential_qty
-
-    @api.multi
-    @api.depends('component_ids.potential_qty')
-    def _get_potential_qty(self):
-        """Compute the potential qty based on the available components."""
+    def _product_available(self, field_names=None, arg=False):
+        res = super(ProductProduct, self)._product_available(
+            field_names=field_names, arg=arg)
         bom_obj = self.env['mrp.bom']
-        uom_obj = self.env['product.uom']
 
-        for product in self:
-            bom_id = bom_obj._bom_find(product_id=product.id)
-            if not bom_id:
-                product.potential_qty = 0.0
+        for prod_id in res:
+            product = self.browse(prod_id)
+            bom = bom_obj._bom_find(product=product)
+            if not bom:
+                res[prod_id]['potential_qty'] = 0.0
                 continue
-
-            bom = bom_obj.browse(bom_id)
 
             # Need by product (same product can be in many BOM lines/levels)
             try:
@@ -64,7 +52,7 @@ class ProductProduct(models.Model):
 
             if not component_needs:
                 # The BoM has no line we can use
-                product.potential_qty = 0.0
+                potential_qty = 0.0
 
             else:
                 # Find the lowest quantity we can make with the stock at hand
@@ -73,13 +61,31 @@ class ProductProduct(models.Model):
                      for component, need in component_needs.items()]
                 )
 
-                # Compute with bom quantity
-                bom_qty = uom_obj._compute_qty_obj(
-                    bom.product_uom,
-                    bom.product_qty,
-                    bom.product_tmpl_id.uom_id
-                )
-                product.potential_qty = bom_qty * components_potential_qty
+                potential_qty = bom.product_qty * components_potential_qty
+            res[prod_id]['potential_qty'] = potential_qty
+            res[prod_id]['immediately_usable_qty'] += potential_qty
+
+        return res
+
+    @api.multi
+    @api.depends('potential_qty', 'component_ids.immediately_usable_qty')
+    def _compute_immediately_usable_qty(self):
+        """Add the potential quantity to the quantity available to promise.
+           This is the same implementation as for templates."""
+
+        res = self._product_available()
+
+        for prod in self:
+            prod.immediately_usable_qty = res[prod.id][
+                'immediately_usable_qty']
+
+    @api.multi
+    @api.depends('component_ids.potential_qty')
+    def _get_potential_qty(self):
+        """Compute the potential qty based on the available components."""
+        res = self._product_available()
+        for product in self:
+            product.potential_qty = res[product.id]['potential_qty']
 
     def _get_component_qty(self, component):
         """ Return the component qty to use based en company settings.
@@ -101,23 +107,10 @@ class ProductProduct(models.Model):
         :type bom: mrp_bom
         :rtype: collections.Counter
         """
-        bom_obj = self.env['mrp.bom']
-        uom_obj = self.env['product.uom']
-        product_obj = self.env['product.product']
-
         needs = Counter()
-        for bom_component in bom_obj._bom_explode(bom, product, 1.0)[0]:
-            product_uom = uom_obj.browse(bom_component['product_uom'])
-            component = product_obj.browse(bom_component['product_id'])
-
-            component_qty = uom_obj._compute_qty_obj(
-                product_uom,
-                bom_component['product_qty'],
-                component.uom_id,
-            )
-            needs += Counter(
-                {component: component_qty}
-            )
+        for bom_component in bom.explode(product, 1.0)[1]:
+            component = bom_component[0].product_id
+            needs += Counter({component: bom_component[1]['qty']})
 
         return needs
 
@@ -125,10 +118,7 @@ class ProductProduct(models.Model):
         """ Compute component_ids by getting all the components for
         this product.
         """
-        bom_obj = self.env['mrp.bom']
-
-        bom_id = bom_obj._bom_find(product_id=self.id)
-        if bom_id:
-            bom = bom_obj.browse(bom_id)
-            for bom_component in bom_obj._bom_explode(bom, self, 1.0)[0]:
-                self.component_ids |= self.browse(bom_component['product_id'])
+        bom = self.env['mrp.bom']._bom_find(product_id=self.id)
+        if bom:
+            for bom_component in bom.explode(self, 1.0)[1]:
+                self.component_ids |= bom_component[0].product_id
