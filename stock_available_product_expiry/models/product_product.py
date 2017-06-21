@@ -29,12 +29,14 @@ class ProductProduct(models.Model):
     )
 
     def _get_domain_locations(self):
-        if not self.env['product.template']._must_check_expired_lots():
-            return super(ProductProduct, self)._get_domain_locations()
-
         quant_domain, move_in_domain, move_out_domain = super(
             ProductProduct, self)._get_domain_locations()
+        if self.env['product.template']._must_check_expired_lots():
+            quant_domain += self._get_domain_lots()
+        return quant_domain, move_in_domain, move_out_domain
 
+    @api.multi
+    def _get_domain_lots(self):
         max_removal_date = fields.Datetime.now()
         from_date = self.env.context.get('from_date', False)
         if from_date:
@@ -53,13 +55,28 @@ class ProductProduct(models.Model):
             ('lot_id.removal_date', removal_op, max_removal_date)]
         if not compute_expired_only:
             lot_domain = [
-                '|',
-                ('lot_id', '=', False),
-                '&'] + lot_domain
+                             '|',
+                             ('lot_id', '=', False),
+                             '&'] + lot_domain
+        return lot_domain
 
-        quant_domain += lot_domain
-
-        return quant_domain, move_in_domain, move_out_domain
+    @api.multi
+    def _compute_quantities_dict(self, lot_id, owner_id, package_id,
+                                 from_date=False, to_date=False):
+        res = super(ProductProduct, self)._compute_quantities_dict(
+            lot_id, owner_id, package_id, from_date, to_date)
+        if not self.env['product.template']._must_check_expired_lots():
+            return res
+        domains = self._get_domain_locations()
+        domain_move_out_loc = domains[2]
+        quants_move_out_domain = domain_move_out_loc + self._get_domain_lots()
+        stock_quant_obj = self.env['stock.quant']
+        quants = stock_quant_obj.read_group(
+            quants_move_out_domain, ['product_id', 'qty'],['product_id'])
+        quants_res = {item['product_id'][0]: item['qty']) for item in \
+                Quant.read_group(domain_quant, ['product_id', 'qty'],
+                                 ['product_id'])}
+        return res
 
     def _get_expired_quants_domain(self, removal_date=None):
         self_with_context = self.with_context(
