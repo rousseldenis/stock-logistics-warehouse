@@ -31,10 +31,18 @@ class ProductProduct(models.Model):
              "be removed from the stock since these are expired."
     )
 
+    def _get_original_domain_locations(self):
+        """ Allow to get domains without the filter on the
+        expired lots
+        """
+        return self.with_context(
+            disable_check_expired_lots=True)._get_domain_locations()
+
     def _get_domain_locations(self):
         quant_domain, move_in_domain, move_out_domain = super(
             ProductProduct, self)._get_domain_locations()
-        if self.env['product.template']._must_check_expired_lots():
+        if (not self.env.context.get('disable_check_expired_lots', False) and
+                self.env['product.template']._must_check_expired_lots()):
             quant_domain += self._get_domain_quant_lots()
         return quant_domain, move_in_domain, move_out_domain
 
@@ -65,13 +73,14 @@ class ProductProduct(models.Model):
 
     @api.multi
     def _get_expired_quants_domain(self, removal_date=None):
-        """ Compute the domain used to retrieved all the quants in
-        stock and reserved for an outgoing move an for an expired stock
+        """ Compute the domain used to retrieve all the quants in
+        stock and reserved for an outgoing move and for an expired stock
         production lot
         :return: quant_domain, quant_out_domain
         """
+        from_date = self.env.context.get('from_date', removal_date)
         self_with_context = self.with_context(
-            compute_expired_only=True, from_date=removal_date)
+            compute_expired_only=True, from_date=from_date)
         quant_domain, move_in_domain, move_out_domain = \
             self_with_context._get_domain_locations()
         quant_out_domain = copy.copy(quant_domain)
@@ -123,14 +132,6 @@ class ProductProduct(models.Model):
                 precision_rounding=product.uom_id.rounding
             )
         return res
-
-    @api.multi
-    def _compute_expired_qty(self):
-        self_with_context = self.with_context(compute_expired_only=True)
-        res = self_with_context._product_available()
-        for product in self:
-            product.qty_expired = res[product.id]['qty_available']
-            product.outgoing_expired_qty = res[product.id]['outgoing_qty']
 
     @api.multi
     def action_open_expired_quants(self):
