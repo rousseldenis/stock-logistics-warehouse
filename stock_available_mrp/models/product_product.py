@@ -5,21 +5,12 @@
 from collections import Counter
 
 from odoo import models, fields, api
-from odoo.addons import decimal_precision as dp
 
 from odoo.exceptions import AccessError
 
 
 class ProductProduct(models.Model):
     _inherit = 'product.product'
-
-    potential_qty = fields.Float(
-        compute='_get_potential_qty',
-        type='float',
-        digits=dp.get_precision('Product Unit of Measure'),
-        string='Potential',
-        help="Quantity of this Product that could be produced using "
-             "the materials already at hand.")
 
     # Needed for fields dependencies
     # When self.potential_qty is compute, we want to force the ORM
@@ -30,16 +21,14 @@ class ProductProduct(models.Model):
     )
 
     @api.multi
-    def _product_available(self, field_names=None, arg=False):
-        res = super(ProductProduct, self)._product_available(
-            field_names=field_names, arg=arg)
+    def _compute_potential_qty_dict(self):
         bom_obj = self.env['mrp.bom']
-
-        for prod_id in res:
-            product = self.browse(prod_id)
+        res = {}
+        for product in self:
+            res[product.id] = {}
             bom = bom_obj._bom_find(product=product)
             if not bom:
-                res[prod_id]['potential_qty'] = 0.0
+                res[product.id]['potential_qty'] = 0.0
                 continue
 
             # Need by product (same product can be in many BOM lines/levels)
@@ -62,8 +51,7 @@ class ProductProduct(models.Model):
                 )
 
                 potential_qty = bom.product_qty * components_potential_qty
-            res[prod_id]['potential_qty'] = potential_qty
-            res[prod_id]['immediately_usable_qty'] += potential_qty
+            res[product.id]['potential_qty'] = potential_qty
 
         return res
 
@@ -72,18 +60,15 @@ class ProductProduct(models.Model):
     def _compute_immediately_usable_qty(self):
         """Add the potential quantity to the quantity available to promise.
            This is the same implementation as for templates."""
-
-        res = self._product_available()
-
+        super(ProductProduct, self)._compute_immediately_usable_qty()
         for prod in self:
-            prod.immediately_usable_qty = res[prod.id][
-                'immediately_usable_qty']
+            prod.immediately_usable_qty += prod.potential_qty
 
     @api.multi
     @api.depends('component_ids.potential_qty')
-    def _get_potential_qty(self):
+    def _compute_potential_qty(self):
         """Compute the potential qty based on the available components."""
-        res = self._product_available()
+        res = self._compute_potential_qty_dict()
         for product in self:
             product.potential_qty = res[product.id]['potential_qty']
 
