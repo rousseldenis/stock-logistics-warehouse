@@ -27,7 +27,27 @@ class ProductProduct(models.Model):
     @api.multi
     def _compute_available_quantities_dict(self):
         res = super(ProductProduct, self)._compute_available_quantities_dict()
+
+        # avoid to make one query per product to find if it has a bom or not
+        domain = [('product_id', 'in', self.ids)]
+        product_tmpl_ids = []
+        product_ids = self.env['mrp.bom'].search(domain).mapped('product_id')
         for product in self:
+            if product.id not in product_ids.ids:
+                product_tmpl_ids.append(product.product_tmpl_id.id)
+        domain = [('product_id', '=', False),
+                  ('product_tmpl_id', 'in', product_tmpl_ids)]
+        bom_template = self.env['mrp.bom'].search(domain)
+        product_ids = product_ids.ids
+        template_ids = bom_template.mapped('product_tmpl_id.id')
+
+        if not template_ids and not product_ids:
+            return res
+
+        for product in self:
+            if product.id not in product_ids and product.product_tmpl_id.id \
+                    not in template_ids:
+                continue
             bom = self.env['mrp.bom']._bom_find(product=product)
             if not bom:
                 res[product.id]['potential_qty'] = 0.0
