@@ -20,7 +20,7 @@ class ProductProduct(models.Model):
         compute='_get_component_ids',
     )
 
-    @api.depends('virtual_available', 'component_ids.potential_qty')
+    @api.depends('virtual_available')  # ('component_ids.potential_qty')
     def _compute_available_quantities(self):
         super(ProductProduct, self)._compute_available_quantities()
 
@@ -31,27 +31,34 @@ class ProductProduct(models.Model):
         # avoid to make one query per product to find if it has a bom or not
         domain = [('product_id', 'in', self.ids)]
         product_tmpl_ids = []
-        product_ids = self.env['mrp.bom'].search(domain).mapped('product_id')
+        bom_product_ids = self.env['mrp.bom'].search(domain)
+        # find boms linked to the product
+        bom_by_product_id = {
+            b.product_id.id: b for b in bom_product_ids}
+        product_id_found = bom_by_product_id.keys()
         for product in self:
-            if product.id not in product_ids.ids:
+            if product.id not in product_id_found:
                 product_tmpl_ids.append(product.product_tmpl_id.id)
         domain = [('product_id', '=', False),
                   ('product_tmpl_id', 'in', product_tmpl_ids)]
-        bom_template = self.env['mrp.bom'].search(domain)
-        product_ids = product_ids.ids
-        template_ids = bom_template.mapped('product_tmpl_id.id')
+        # find boms linked to the product template
+        bom_product_template = self.env['mrp.bom'].search(domain)
+        bom_by_product_tmpl_id = {
+            b.product_tmpl_id.id: b for b in bom_product_template}
 
-        if not template_ids and not product_ids:
+        if not bom_by_product_id and not bom_by_product_tmpl_id:
             return res
-
+        if not hasattr(self, '_bom_computed'):
+            self._bom_computed = []
         for product in self:
-            if product.id not in product_ids and product.product_tmpl_id.id \
-                    not in template_ids:
-                continue
-            bom = self.env['mrp.bom']._bom_find(product=product)
+            bom = bom_by_product_id.get(
+                product.id,
+                bom_by_product_tmpl_id.get(product.product_tmpl_id.id)
+            )
             if not bom:
                 res[product.id]['potential_qty'] = 0.0
                 continue
+            self._bom_computed.append(bom.id)
 
             # Need by product (same product can be in many BOM lines/levels)
             try:
@@ -76,6 +83,7 @@ class ProductProduct(models.Model):
 
             res[product.id]['potential_qty'] = potential_qty
             res[product.id]['immediately_usable_qty'] += potential_qty
+
         return res
 
     def _get_component_qty(self, component):
@@ -111,5 +119,4 @@ class ProductProduct(models.Model):
         """
         bom = self.env['mrp.bom']._bom_find(product_id=self.id)
         if bom:
-            for bom_component in bom.explode(self, 1.0)[1]:
-                self.component_ids |= bom_component[0].product_id
+            self.component_ids = bom.explode(self, 1.0)[1].mapped('product_id')
