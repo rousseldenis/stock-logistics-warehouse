@@ -23,38 +23,15 @@ class ProductTemplate(models.Model):
         string='Unreserved stock quantity')
 
     @api.multi
+    @api.depends('product_variant_ids.qty_available_not_res')
     def _compute_product_available_not_res(self):
         no_new = self.filtered(
             lambda x: not isinstance(x.id, models.NewId))
-        res = no_new._product_available()
         for tmpl in no_new:
-            qty = res[tmpl.id]['qty_available_not_res']
-            tmpl.qty_available_not_res = qty
-            text = res[tmpl.id]['qty_available_stock_text']
-            tmpl.qty_available_stock_text = text
-
-    @api.multi
-    def _product_available(self, name=None, arg=False):
-        prod_available = super(ProductTemplate, self)._product_available(name,
-                                                                         arg)
-
-        variants = self.mapped('product_variant_ids')
-        variant_available = variants._product_available()
-
-        for product in self:
-            if isinstance(product.id, models.NewId):
-                continue
-            qty_available_not_res = 0.0
-            text = ''
-            for p in product.product_variant_ids:
-                qty = variant_available[p.id]["qty_available_not_res"]
-                qty_available_not_res += qty
-                text = variant_available[p.id]["qty_available_stock_text"]
-            prod_available[product.id].update({
-                "qty_available_not_res": qty_available_not_res,
-                "qty_available_stock_text": text,
-            })
-        return prod_available
+            tmpl.qty_available_not_res = sum(tmpl.mapped(
+                'product_variant_ids.qty_available_not_res'))
+            tmpl.qty_available_stock_text = "/".join(tmpl.mapped(
+                'product_variant_ids.qty_available_stock_text'))
 
     @api.multi
     def action_open_quants_unreserved(self):
@@ -80,7 +57,7 @@ class ProductProduct(models.Model):
 
     @api.multi
     def _compute_qty_available_not_res(self):
-        res = self._product_available()
+        res = self._compute_product_available_not_res_dict()
         for prod in self:
             qty = res[prod.id]['qty_available_not_res']
             text = res[prod.id]['qty_available_stock_text']
@@ -107,15 +84,13 @@ class ProductProduct(models.Model):
         return False
 
     @api.multi
-    def _product_available(self, field_names=None, arg=False):
+    def _compute_product_available_not_res_dict(self):
 
-        res = super(ProductProduct, self).\
-            _product_available(field_names=field_names,
-                               arg=arg)
+        res = {}
 
         domain_quant = self._prepare_domain_available_not_res(self)
 
-        quants = self.env['stock.quant'].read_group(
+        quants = self.env['stock.quant'].with_context(lang=False).read_group(
             domain_quant,
             ['product_id', 'location_id', 'qty'],
             ['product_id', 'location_id'],
@@ -125,7 +100,8 @@ class ProductProduct(models.Model):
             # create a dictionary with the total value per products
             values_prod.setdefault(quant['product_id'][0], 0)
             values_prod[quant['product_id'][0]] += quant['qty']
-        for product in self:
+        for product in self.with_context(prefetch_fields=False, lang=''):
+            res[product.id] = {}
             # get total qty for the product
             qty = float_round(values_prod.get(product.id, 0.0),
                               precision_rounding=product.uom_id.rounding)
