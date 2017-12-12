@@ -1,3 +1,4 @@
 stock-logistics-tracking
 stock-logistics-barcode
 OpenUpgrade
+web
